@@ -416,6 +416,7 @@ class Interpreter:
             "cls": self.cls,
             "uptime": self.uptime,
             "neofetch": self.neofetch,
+            "title": self.title,
             "rm": self.rm,
             "rl": self.reload,
             "exit": exit,
