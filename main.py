@@ -9,8 +9,16 @@ from enum import Enum, auto
 from typing import Any
 from helpers import *
 
+sigint_paused = False
+
 def sigint_handler(sig, frame):
-    return 0
+    global sigint_paused
+    
+    if sigint_paused:
+        return
+    
+    sigint_paused = True
+    raise KeyboardInterrupt
 
 signal(SIGINT, sigint_handler)
 
@@ -432,7 +440,7 @@ class Interpreter:
             res = res.format(*variables)
         
         try:
-            res = eval(res)          
+            res = eval(res)
             return res if type(res) is not bool else int(res)
         except Exception as error:
             raise SyntaxError(error)
@@ -493,24 +501,12 @@ class Interpreter:
         info = uname()
         uptime = get_uptime()
 
-        logo = \
-"""                :^~^:                 
-         :~7?7??JY55Y?!~^             
-       :!JJ?!!!7!!!!7?YYJ7:   ^       
-   :^!?J?!~~~~!!77!!777?YPY~:^7~      
- :~!JJ?^:^!?Y5P55P5YY7~^:!77???7      
- :^7YJ^:~7JPG5J7!!!^::^::^:!?J5?      
- :!YJ7~!JJY?^:    :   ~:~:  ??5J      
-:!JJJ7~?J7^          :::~~^ ~5PP~:^   
-:~7Y57!~~                 7?75PG57!   
-:^!JY7J^              :  ^7GP55GP?:   
- ^~~J~?~              :~7JYGPJ5P?:::  
-    7?~!~^^:   :^:^~!?Y5PPPPJY5?!~~   
-    :?J???7!!!7?YPGGGBBP555YY5J?7~    
-      ~J5PPP5PPYPBGGGGPPGG5Y7~!:      
-        ^7Y555PPPP5YYYJYPJ~^^         
-           :^7J55YJ7!~~~~^::          
-               :~!~                   """.split("\n")
+        logo = open(self.variables["_logo_"], "r").read().split("\n")
+        
+        try:
+            ver = VERSION
+        except NameError:
+            ver = self.variables["_version_"]
         
         buf = [
             "OS: {} {} {}".format(
@@ -520,7 +516,7 @@ class Interpreter:
             "Uptime: {} days, {} hours, {} minutes".format(
                 uptime.days, uptime.hours, uptime.mins),
             "and {} seconds".format(uptime.secs),
-            "Shell: PangShell {}".format(VERSION),
+            "Shell: PangShell v{}".format(ver),
             "Resolution: {}".format(get_screen_res()),
             ]
         
@@ -533,7 +529,7 @@ class Interpreter:
 
         to_write = gradient(to_write, (230, 45, 65), (55, 125, 235))
         
-        stdout.write("\n" + "\n".join(to_write) + "\n\n")
+        stdout.write("\n" + "\n".join(to_write) + "\n")
         stdout.flush()
     
     def title(self) -> None:
@@ -673,9 +669,12 @@ def run_file(i: Interpreter, file: str) -> None:
             print(rgb(error, RED))
 
 if __name__ == "__main__":
+    sigint_paused = True
     i = Interpreter()
     i.variables["MAIN_DIR"] = MAIN_DIR
     run_file(i, os.path.join(MAIN_DIR, "startup.ps"))
+    
+    VERSION = i.variables["_version_"]
     
     if "--vars" in argv:
         variables_index = argv.index("--vars")
@@ -693,10 +692,14 @@ if __name__ == "__main__":
             l = Lexer(scanner.inp)
             p = Parser(l)
             p.parse()
+            sigint_paused = False
             i.run(p.ast)
+            sigint_paused = True
         except SyntaxError as error:
             print(rgb(error, RED))
         except KeyError as var_name:
             print(rgb("Variable {} does not exist.".format(var_name), RED))
         except Exception as error:
             print(rgb(error, RED))
+        except KeyboardInterrupt:
+            pass

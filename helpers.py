@@ -42,8 +42,6 @@ keywords = [
 
 # Constants
 
-VERSION = "v1.0"
-
 RED = (255, 0, 0)
 GREEN = (0, 205, 0)
 BLUE = (55, 125, 190)
@@ -172,44 +170,6 @@ def get_screen_res() -> str:
     user32.SetProcessDPIAware()
     return "{}x{}".format(user32.GetSystemMetrics(0),
                    user32.GetSystemMetrics(1))
-
-autofill_cycle = False
-
-# Tuple[str, str]
-# Tuple[inp, to_write]
-def auto_fill(inp: str, autofill_count: int, pos: int) -> str:
-    if inp.rstrip().find(" ") != -1:
-        return inp
-
-    global autofill_cycle
-    
-    if not inp:
-        autofill_cycle = True
-        keyword = keywords[0]
-        return keyword, keyword
-
-    if autofill_cycle:
-        keyword = keywords[autofill_count % len(keywords)]
-        return keyword
-
-    autofill_cycle = False
-    
-    valid_kws = [x for x in keywords if x.startswith(inp[0]) and x != inp]
-
-    if valid_kws:
-        keyword = valid_kws[autofill_count % len(valid_kws)]
-    else:
-        keyword = keywords[autofill_count % len(keywords)]
-    
-    return keyword
-
-def backspace(inp, pos) -> str:
-    if pos <= 0:
-        return inp
-    elif pos == len(inp):
-        return inp[:-1]
-    
-    return inp[:(pos-1)] + inp[pos:]
 
 def get_console_info() -> tuple:
     csbi = ctypes.create_string_buffer(22)
@@ -353,8 +313,8 @@ class Scanner:
             stdout.flush()
 
             ch = self.getch()
-
-            if ch == 224:
+            
+            if ch in (0, 224):
                 self.handle_special_char()
                 ch = ""
             else:
