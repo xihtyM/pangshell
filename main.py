@@ -432,7 +432,7 @@ class Interpreter:
             res = res.format(*variables)
         
         try:
-            res = eval(res)            
+            res = eval(res)          
             return res if type(res) is not bool else int(res)
         except Exception as error:
             raise SyntaxError(error)
@@ -658,11 +658,27 @@ class Interpreter:
             
             self.ind += 1
 
+def run_file(i: Interpreter, file: str) -> None:
+    for line in open(file, "r").readlines():
+        try:
+            l = Lexer(line.replace("\n", ""))
+            p = Parser(l)
+            p.parse()
+            i.run(p.ast)
+        except SyntaxError as error:
+            print(rgb(error, RED))
+        except KeyError as var_name:
+            print(rgb("Variable {} does not exist.".format(var_name), RED))
+        except Exception as error:
+            print(rgb(error, RED))
+
 if __name__ == "__main__":
     i = Interpreter()
+    i.variables["MAIN_DIR"] = MAIN_DIR
+    run_file(i, os.path.join(MAIN_DIR, "startup.ps"))
     
     if "--vars" in argv:
-        variables_index = argv.index("--vars") 
+        variables_index = argv.index("--vars")
         i.variables = eval(argv[variables_index + 1])
         del argv[variables_index + 1], argv[variables_index]
     
@@ -682,5 +698,5 @@ if __name__ == "__main__":
             print(rgb(error, RED))
         except KeyError as var_name:
             print(rgb("Variable {} does not exist.".format(var_name), RED))
-        except Exception as err:
-            print(rgb(err, RED))
+        except Exception as error:
+            print(rgb(error, RED))

@@ -5,6 +5,7 @@ from datetime import date
 from math import log, floor
 from dataclasses import dataclass
 from platform import uname, system
+from locale import setlocale, LC_ALL
 
 from sys import stdout, platform, \
     executable, argv
@@ -17,8 +18,11 @@ except ImportError:
 UNIX = system() == "Linux"
 WIN = system() == "Windows"
 
+setlocale(LC_ALL, ".utf-8")
 gHandle = ctypes.windll.kernel32.GetStdHandle(
     ctypes.c_long(-11))
+ctypes.windll.kernel32.SetConsoleMode(gHandle, 7)
+MAIN_DIR = os.path.dirname(os.path.realpath(__file__))
 
 if UNIX:
     libc = ctypes.CDLL('libc.so.6')
@@ -233,7 +237,7 @@ def move_cursor(x: int, y: int, relative: bool = True) -> int:
             ctypes.c_ulong(move)
         )
 
-def clear_out(inp_len, old_pos):
+def clear_out(inp_len: int, old_pos: int) -> str:
     return " " * (inp_len - old_pos) + "\b \b" * (inp_len)
 
 def kbhit_wait() -> None:
