@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from platform import uname, system
 from locale import setlocale, LC_ALL
 from threading import Thread
+from time import sleep
 
 from sys import stdout, platform, \
     executable, argv
@@ -201,12 +202,14 @@ def clear_out(inp_len: int, old_pos: int) -> str:
 
 def kbhit_wait() -> None:
     while not kbhit():
-        pass
+        sleep(0.02)
 
 def remove_word(s: str, pos: int) -> str:
-    if s[:pos].rfind(" ") != -1:
-        return s[:pos][s[:pos].rfind(" ")]
-    return s[pos:]
+    index = s.rfind(" ", 0, pos)
+    
+    if index == -1:
+        return s[pos:]
+    return s[:index] + s[pos:]
 
 _ls_buf = ""
 _ls_files = _ls_dirs = 0

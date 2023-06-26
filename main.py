@@ -515,9 +515,9 @@ class Interpreter:
             "Uptime: {} days, {} hours, {} minutes".format(
                 uptime.days, uptime.hours, uptime.mins),
             "and {} seconds".format(uptime.secs),
-            "Shell: PangShell v{}".format(ver),
             "Resolution: {}".format(get_screen_res()),
-            ]
+            "Shell: PangShell v{}".format(ver),
+        ]
         
         to_write = []
         
