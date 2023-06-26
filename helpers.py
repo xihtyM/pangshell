@@ -6,6 +6,7 @@ from math import log, floor
 from dataclasses import dataclass
 from platform import uname, system
 from locale import setlocale, LC_ALL
+from threading import Thread
 
 from sys import stdout, platform, \
     executable, argv
@@ -89,9 +90,7 @@ def format_date(timestamp: float | int) -> str:
     return "{}{}{} {}".format(months[date_.month], " " if date_.day > 9 \
                               else "  ", date_.day, date_.year)
 
-def format_size(entry) -> str:
-    size: int = entry.stat().st_size
-    
+def format_size(size: int) -> str:
     if not size:
         return "0 b"
     
@@ -209,6 +208,55 @@ def remove_word(s: str, pos: int) -> str:
         return s[:pos][s[:pos].rfind(" ")]
     return s[pos:]
 
+_ls_buf = ""
+_ls_files = _ls_dirs = 0
+
+def ls_thread(extension: str, iterator) -> None:
+    global _ls_buf, _ls_files, _ls_dirs
+    
+    for entry in iterator:
+        if not entry.name.endswith(extension):
+            continue
+        
+        formatted_date = format_date(entry.stat().st_mtime)
+        
+        if entry.is_file():
+            _ls_buf += rgb(formatted_date, GREEN) \
+                + " File: " \
+                + rgb("{:>9} ".format(format_size(entry.stat().st_size)), RED) \
+                + rgb(entry.name, BLUE) + "\n"
+            _ls_files += 1
+        elif entry.is_dir():
+            _ls_buf += rgb(formatted_date, GREEN) \
+                + " Dir:            " \
+                + rgb(entry.name, BLUE) + "\n"
+            _ls_dirs += 1
+
+def threaded_ls(extension: str, path: str | None = None) -> str:
+    global _ls_buf, _ls_files, _ls_dirs
+    
+    dir_list = list(os.scandir(path))
+    entries = len(dir_list)
+    dir_list_left = dir_list[:entries>>1]
+    dir_list_right = dir_list[entries>>1:]
+    
+    t1 = Thread(target=ls_thread, args=(extension, dir_list_left))
+    t2 = Thread(target=ls_thread, args=(extension, dir_list_right))
+    
+    t1.start()
+    t2.start()
+    
+    t1.join()
+    t2.join()
+    
+    ls_buf = _ls_buf
+    ls_files = _ls_files
+    ls_dirs = _ls_dirs
+    
+    _ls_buf = ""
+    _ls_files = _ls_dirs = 0
+    return ls_buf + "\n - Files: {}\n - Directories: {}\n".format(ls_files, ls_dirs)
+
 class Scanner:
     def __init__(self) -> None:
         self.autofill_cycle = False
@@ -218,8 +266,10 @@ class Scanner:
         self.prev_count = 0
         self.inp = ""
 
-    def getch(self) -> int:
-        kbhit_wait()
+    def getch(self, wait: bool = True) -> int:
+        if wait:
+            kbhit_wait()
+        
         return ord(getch())
 
     def auto_fill(self) -> None:
@@ -254,15 +304,15 @@ class Scanner:
 
         self.pos -= 1
 
-        if self.pos == len(self.inp):
+        if self.pos >= len(self.inp):
             self.inp = self.inp[:-1]
             return
 
         self.inp = self.inp[:self.pos] + self.inp[self.pos+1:]
 
     def handle_special_char(self) -> None:
-        ch = self.getch()
-                
+        ch = self.getch(False)
+
         if ch == 75 and self.pos > 0:
             self.pos -= 1
             move_cursor(-1, 0)

@@ -98,7 +98,7 @@ class Lexer:
         
         variable = raw == "$" # check if defining variable
         
-        while self._peek() in "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+        while self._peek() in "._abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
             raw += self._peek()
 
             if not self._get():
@@ -169,7 +169,7 @@ class Lexer:
 
             cur = self._peek()
             
-            if cur in "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            if cur in ".$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
                 self.identifier()
             elif cur in "0123456789":
                 self.num()
@@ -284,8 +284,7 @@ class Parser:
             elif self.cur.type_ == TokenType.STRING:
                 expr += "\"{}\"".format(self.cur.value)
             elif self.cur.type_ == TokenType.ID:
-                raise SyntaxError("Identifier '{}' is only usable in assignment expressions.".format(
-                    self.cur.value))
+                expr += "\"{}\"".format(self.cur.value)
             else:
                 expr += str(self.cur.value)
             
@@ -537,6 +536,7 @@ class Interpreter:
             ctypes.windll.kernel32.SetConsoleTitleW(self.evaluate_expr())
         except AttributeError:
             stdout.write("\033]0;{}\007".format(self.evaluate_expr()))
+            stdout.flush()
     
     def cls(self) -> None:
         IgnoreReturn(os.system("cls||clear"))
@@ -544,28 +544,38 @@ class Interpreter:
     def ls(self) -> None:
         cur = self.ast[self.ind]
         
-        buf = "\n -- {} --\n\n".format(gcwd())
+        args = []
+        n = 0
+        
+        for arg in cur.expr:
+            if arg == "{}":
+                args.append(str(self.variables[cur.variables[n]]))
+                n += 1
+            else:
+                args.append(arg)
+        
+        del n
         extension = ""
+        extension_st = False
+        path = None
         
-        if "-O" in cur.expr:
-            extension = cur.expr[cur.expr.index("-O") + 1]
-        
-        for entry in os.scandir():
-            if not entry.name.endswith(extension):
+        for arg in args:
+            if extension_st and not extension:
+                extension = arg
                 continue
             
-            formatted_date = format_date(entry.stat().st_mtime)
+            if arg == "-O":
+                extension_st = True
+                continue
             
-            if entry.is_file():
-                buf += rgb(formatted_date, GREEN) \
-                    + " File: " \
-                    + rgb("{:>9} ".format(format_size(entry)), RED) \
-                    + rgb(entry.name, BLUE) + "\n"
-            elif entry.is_dir():
-                buf += rgb(formatted_date, GREEN) \
-                    + " Dir:            " + rgb(entry.name, BLUE) + "\n"
+            if arg:
+                path = arg
         
-        print(buf)
+        buf = "\n -- {} --\n\n".format(format_path(os.path.abspath(path) if path else gcwd()))
+        buf += threaded_ls(extension, path)
+        
+        stdout.write(buf + "\n")
+        stdout.flush()
 
     def cd(self) -> None:
         new_dir = self.evaluate_expr()
