@@ -202,7 +202,7 @@ def clear_out(inp_len: int, old_pos: int) -> str:
 
 def kbhit_wait() -> None:
     while not kbhit():
-        sleep(0.02)
+        sleep(0.03)
 
 def remove_word(s: str, pos: int) -> str:
     index = s.rfind(" ", 0, pos)
