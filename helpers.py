@@ -5,6 +5,7 @@ from datetime import date
 from math import log, floor
 from dataclasses import dataclass
 from platform import uname, system
+from signal import signal, SIGINT
 from locale import setlocale, LC_ALL
 from threading import Thread
 from time import sleep
@@ -16,6 +17,20 @@ try:
     from getch import getch
 except ImportError:
     from msvcrt import getwch as getch, kbhit
+
+def_stdout = stdout
+sigint_paused = False
+
+def sigint_handler(sig, frame):
+    global sigint_paused
+    
+    if sigint_paused:
+        return
+    
+    sigint_paused = True
+    raise KeyboardInterrupt
+
+signal(SIGINT, sigint_handler)
 
 UNIX = system() == "Linux"
 WIN = system() == "Windows"
@@ -34,12 +49,15 @@ if UNIX:
 IgnoreReturn = lambda x: None
 
 keywords = [
-    "echo", "ls",
-    "cd", "type",
-    "touch", "exit",
-    "cls", "neofetch",
-    "uptime", "rm", "rl",
-    "title",
+    "ls",   "echo",
+    "cd",   "type",
+    "rl",   "sudo",
+    "rm",   "touch",
+    "del",  "title",
+    "cls",  "uptime",
+    "exit", "neofetch",
+    
+    "@echo",
 ]
 
 # Constants
@@ -340,9 +358,10 @@ class Scanner:
 
     def scan(self) -> None:
         self.inp = ""
+        self.pos = 0
         ch = ""
 
-        while ch != "\r":
+        while ch not in ("\r", "\n"):
             inp_len = len(self.inp)
             old_pos = self.pos
             

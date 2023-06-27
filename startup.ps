@@ -1,5 +1,10 @@
+@echo off
 _version_ = 1.1
+_main_ = $MAIN_DIR + "/main.py"
 _logo_ = $MAIN_DIR + "/logo.txt"
+chcp "65001"
 
-title "PangShell v%.2f" % $_version_
+title "PangShell v%.1f" % $_version_
 
+@echo on
+neofetch

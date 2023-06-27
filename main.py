@@ -3,24 +3,10 @@
 from subprocess import run, list2cmdline, \
     CREATE_NEW_CONSOLE, Popen
 
-from signal import signal, SIGINT
 from socket import gethostname
 from enum import Enum, auto
 from typing import Any
 from helpers import *
-
-sigint_paused = False
-
-def sigint_handler(sig, frame):
-    global sigint_paused
-    
-    if sigint_paused:
-        return
-    
-    sigint_paused = True
-    raise KeyboardInterrupt
-
-signal(SIGINT, sigint_handler)
 
 try:
     from sys import set_int_max_str_digits
@@ -98,7 +84,7 @@ class Lexer:
         
         variable = raw == "$" # check if defining variable
         
-        while self._peek() in "._abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+        while self._peek() in ".@_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
             raw += self._peek()
 
             if not self._get():
@@ -169,7 +155,7 @@ class Lexer:
 
             cur = self._peek()
             
-            if cur in ".$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            if cur in ".@$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
                 self.identifier()
             elif cur in "0123456789":
                 self.num()
@@ -241,11 +227,13 @@ class Keyword:
     name: str
     expr: str | list[str]
     variables: list[str] | None = None
+    sudo: bool = False
 
 @dataclass
 class Program:
     args: str
     variables: list[str] | None = None
+    sudo: bool = False
 
 ASTNode = Assign | Keyword | Program
 
@@ -318,12 +306,13 @@ class Parser:
         self.inc()
         
         if keyword in ("echo", "cd", "touch",
-                       "type", "title"):
-            self.ast.append(Keyword(keyword, *self.parse_expr()))
+                       "type", "title", "del",
+                       "@echo"):
+            self.ast.append(Keyword(keyword, *self.parse_expr(), self.sudo))
         elif keyword in ("rm", "ls"):
-            self.ast.append(Keyword(keyword, *self.parse_expr_no_eval()))
+            self.ast.append(Keyword(keyword, *self.parse_expr_no_eval(), self.sudo))
         else:
-            self.ast.append(Keyword(keyword, ""))
+            self.ast.append(Keyword(keyword, "", None, self.sudo))
         
     def skip_whitespace(self) -> None:
         if self.cur.type_ == TokenType.WHITESPACE:
@@ -392,10 +381,17 @@ class Parser:
         if expr is None:
             return # not a program
         
-        self.ast.append(Program(*expr))
+        self.ast.append(Program(*expr, self.sudo))
     
     def parse(self) -> None:
         while self.cur.type_ != TokenType.END_OF_LINE:
+            self.sudo = False
+
+            if self.cur.value == "sudo":
+                self.inc()
+                self.skip_whitespace()
+                self.sudo = True
+            
             if self.cur.type_ == TokenType.KEYWORD:
                 self.parse_keyword()
             elif self.cur.type_ in (TokenType.ID, TokenType.VARIABLE,
@@ -415,19 +411,36 @@ class Interpreter:
         self.ind = 0
         
         self.keyword_function = {
-            "echo": self.echo,
+            "rl": self.reload,
             "cd": self.cd,
             "ls": self.ls,
-            "touch": self.touch,
-            "type": self.type_,
+            "rm": self.rm,
+            "del": self.del_var,
             "cls": self.cls,
+            "type": self.type_,
+            "echo": self.echo,
+            "touch": self.touch,
+            "title": self.title,
             "uptime": self.uptime,
             "neofetch": self.neofetch,
-            "title": self.title,
-            "rm": self.rm,
-            "rl": self.reload,
+            
             "exit": exit,
+            "@echo": self.echo_toggle,
         }
+    
+    def sudo(self, toggle: bool) -> None:
+        if not self.ast[self.ind].sudo:
+            return
+        
+        toggle = int(toggle)
+        
+        for n in range(1, 36):
+            ctypes.windll.ntdll.RtlAdjustPrivilege(
+                ctypes.c_uint(n), 
+                ctypes.c_uint(toggle), 
+                ctypes.c_uint(0), 
+                ctypes.byref(ctypes.c_int())
+            )
     
     def evaluate_expr(self) -> Any:
         cur = self.ast[self.ind]
@@ -443,6 +456,24 @@ class Interpreter:
             return res if type(res) is not bool else int(res)
         except Exception as error:
             raise SyntaxError(error)
+    
+    def echo_toggle(self) -> None:
+        global stdout
+        
+        expr = self.evaluate_expr()
+
+        if expr not in ("on", "off"):
+            raise SyntaxError("@echo only takes arguments: 'on' or 'off'.")
+        
+        if expr == "off":
+            stdout = open(os.devnull, "w", encoding="utf-8")
+        else:
+            stdout = def_stdout
+    
+    def del_var(self) -> None:
+        varname = self.evaluate_expr()
+
+        del self.variables[varname]
     
     def reload(self):
         Popen(
@@ -609,7 +640,7 @@ class Interpreter:
    
         for extension in (".bat", ".exe", ".com"):
             try:
-                run([args[0] + extension] + args[1:])
+                run([args[0] + extension] + args[1:], stdout=stdout)
                 return True
             except FileNotFoundError:
                 pass
@@ -620,7 +651,7 @@ class Interpreter:
             args[0] = os.environ["WINDIR"] + "/System32/" + args[0]
         
         try:
-            run(args)
+            run(args, stdout=stdout)
         except FileNotFoundError:
             if platform == "win32":
                 ran = self.run_with_extensions(args)
@@ -646,10 +677,13 @@ class Interpreter:
             cur = ast[self.ind]
             
             if type(cur) is Keyword:
+                self.sudo(True)
                 self.keyword_function[cur.name]()
+                self.sudo(False)
             elif type(cur) is Assign:
                 self.assign()
             elif type(cur) is Program:
+                self.sudo(True)
                 args = []
                 n = 0
                 
@@ -661,6 +695,7 @@ class Interpreter:
                         args.append(arg)
                 
                 self.run_program(args)
+                self.sudo(False)
             
             self.ind += 1
 
