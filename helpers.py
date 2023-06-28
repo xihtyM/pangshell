@@ -22,14 +22,16 @@ except ImportError:
 def_stdout = stdout
 sigint_paused = False
 
+
 def sigint_handler(sig, frame):
     global sigint_paused
-    
+
     if sigint_paused:
         return
-    
+
     sigint_paused = True
     raise KeyboardInterrupt
+
 
 signal(SIGINT, sigint_handler)
 
@@ -44,10 +46,13 @@ MAIN_DIR = os.path.dirname(os.path.realpath(__file__))
 
 if UNIX:
     libc = ctypes.CDLL('libc.so.6')
-    sysinfo_buf = ctypes.create_string_buffer(4096) # generous buffer to hold
-                                                    # struct sysinfo
+    sysinfo_buf = ctypes.create_string_buffer(4096)  # generous buffer to hold
+    # struct sysinfo
 
-IgnoreReturn = lambda x: None
+
+def IgnoreReturn(x):
+    """ Explicit return ignore. If a return is ignored without this, there may be a bug. """
+
 
 keywords = [
     "ls",   "echo",
@@ -57,7 +62,7 @@ keywords = [
     "del",  "title",
     "cls",  "uptime",
     "exit", "neofetch",
-    
+
     "@echo",
 ]
 
@@ -70,23 +75,27 @@ PURPLE = (159, 60, 230)
 
 USR_PATH = os.path.normpath(os.path.expanduser("~/"))
 
+
 def rgb(string: str, rgb: tuple[int, int, int]) -> str:
     return "\u001b[38;2;{};{};{}m{}\u001B[0m".format(*rgb, string)
+
 
 def format_path(path: str) -> str:
     if path.startswith(USR_PATH):
         path = "~/" + path.lstrip(USR_PATH)
-    
+
     return path.replace("\\", "/")
+
 
 def gcwd() -> str:
     """ Returns formatted current working directory """
     return format_path(os.getcwd())
 
+
 def gradient(strings: list, start: tuple, end: tuple) -> list:
     res = []
     size = len(strings)
-    
+
     for index, line in enumerate(strings):
         res.append(rgb(line,
            (((start[0] * (size - index)) + (end[0] * index))//size,
@@ -94,6 +103,7 @@ def gradient(strings: list, start: tuple, end: tuple) -> list:
             ((start[2] * (size - index)) + (end[2] * index))//size)))
     
     return res
+
 
 months = {
     1: "Jan",  2: "Feb",
@@ -104,29 +114,33 @@ months = {
     11: "Nov", 12: "Dec",
 }
 
+
 def format_date(timestamp: float | int) -> str:
     date_ = date.fromtimestamp(timestamp)
-    
-    return "{}{}{} {}".format(months[date_.month], " " if date_.day > 9 \
+
+    return "{}{}{} {}".format(months[date_.month], " " if date_.day > 9
                               else "  ", date_.day, date_.year)
+
 
 def format_size(size: int) -> str:
     if not size:
         return "0 b"
-    
+
     # 1000**exponent == 1 s.f. of size
     exponent = floor(log(size, 1000))
-    name = ["b", "kb", "mb", "gb", "tb", "pb", "eb", "zb", "yb", "bb"][exponent]
-    
+    name = ["b", "kb", "mb", "gb", "tb", "pb",
+            "eb", "zb", "yb", "bb"][exponent]
+
     return "{} {}".format(round(size / 1000**exponent, 2), name)
+
 
 def recursive_rm(path: str) -> None:
     if not os.path.isdir(path):
         raise NotADirectoryError("'{}' is not a directory.".format(path))
-    
+
     for entry in os.scandir(path):
         joined_path = os.path.join(path, entry.name)
-        
+
         if entry.is_file():
             print("Removing '{}'.".format(entry.name), end="\r")
             os.remove(joined_path)
@@ -136,12 +150,14 @@ def recursive_rm(path: str) -> None:
 
     os.rmdir(path)
 
+
 def normal_rm(path: str) -> None:
     if not os.path.isfile(path):
         raise FileNotFoundError(
             "'{}' is not a file or does not exist.".format(path))
 
     os.remove(path)
+
 
 @dataclass
 class Uptime:
@@ -152,12 +168,13 @@ class Uptime:
 
 # TODO: unix compatibility
 
+
 if system() == "Windows":
     def get_uptime() -> Uptime:
         # https://www.geeksforgeeks.org/getting-the-time-since-os-startup-using-python/
-        
+
         ticks = ctypes.windll.kernel32 \
-                .GetTickCount64()
+            .GetTickCount64()
 
         ms = int(str(ticks)[:-3])
 
@@ -166,11 +183,11 @@ if system() == "Windows":
         days, hour = divmod(hour, 24)
 
         return Uptime(sec, mins, hour, days)
-    
+
 elif system() == "Linux":
     def get_uptime() -> Uptime:
         global sysinfo_buf, libc
-        
+
         if libc.sysinfo(sysinfo_buf) != 0:
             return Uptime(-1, -1, -1, -1)
 
@@ -184,11 +201,13 @@ elif system() == "Linux":
 
         return Uptime(sec, mins, hour, days)
 
+
 def get_screen_res() -> str:
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()
     return "{}x{}".format(user32.GetSystemMetrics(0),
-                   user32.GetSystemMetrics(1))
+                          user32.GetSystemMetrics(1))
+
 
 def get_console_info() -> tuple:
     csbi = ctypes.create_string_buffer(22)
@@ -200,10 +219,11 @@ def get_console_info() -> tuple:
 
     return struct.unpack("hhhhHhhhhhh", csbi.raw)
 
+
 def move_cursor(x: int, y: int, relative: bool = True) -> int:
     if relative:
         width, height, curx, cury, *_ = get_console_info()
-                
+
         move = (x + curx) + ((y + cury) << 16)
     else:
         move = x + (y << 16)
@@ -214,32 +234,37 @@ def move_cursor(x: int, y: int, relative: bool = True) -> int:
             ctypes.c_ulong(move)
         )
 
+
 def clear_out(inp_len: int, old_pos: int) -> str:
     return " " * (inp_len - old_pos) + "\b \b" * (inp_len)
+
 
 def kbhit_wait() -> None:
     while not kbhit():
         sleep(0.03)
 
+
 def remove_word(s: str, pos: int) -> str:
     index = s.rfind(" ", 0, pos)
-    
+
     if index == -1:
         return s[pos:]
     return s[:index] + s[pos:]
 
+
 _ls_buf = ""
 _ls_files = _ls_dirs = 0
 
+
 def ls_thread(extension: str, iterator) -> None:
     global _ls_buf, _ls_files, _ls_dirs
-    
+
     for entry in iterator:
         if not entry.name.endswith(extension):
             continue
-        
+
         formatted_date = format_date(entry.stat().st_mtime)
-        
+
         if entry.is_file():
             _ls_buf += rgb(formatted_date, GREEN) \
                 + " File: " \
@@ -252,32 +277,34 @@ def ls_thread(extension: str, iterator) -> None:
                 + rgb(entry.name, BLUE) + "\n"
             _ls_dirs += 1
 
+
 def threaded_ls(extension: str, path: str | None = None) -> str:
     global _ls_buf, _ls_files, _ls_dirs
-    
+
     dir_list = list(os.scandir(path))
     entries = len(dir_list)
-    dir_list_left = dir_list[:entries>>1]
-    dir_list_right = dir_list[entries>>1:]
+    dir_list_left = dir_list[:entries >> 1]
+    dir_list_right = dir_list[entries >> 1:]
     del dir_list
-    
+
     t1 = Thread(target=ls_thread, args=(extension, dir_list_left))
     t2 = Thread(target=ls_thread, args=(extension, dir_list_right))
     del dir_list_left, dir_list_right
-    
+
     t1.start()
     t2.start()
-    
+
     t1.join()
     t2.join()
-    
+
     ls_buf = _ls_buf
     ls_files = _ls_files
     ls_dirs = _ls_dirs
-    
+
     _ls_buf = ""
     _ls_files = _ls_dirs = 0
     return ls_buf + "\n - Files: {}\n - Directories: {}\n".format(ls_files, ls_dirs)
+
 
 class Scanner:
     def __init__(self) -> None:
@@ -291,13 +318,13 @@ class Scanner:
     def getch(self, wait: bool = True) -> int:
         if wait:
             kbhit_wait()
-        
+
         return ord(getch())
 
     def auto_fill(self) -> None:
         self.pos += 1
         self.autofill_count += 1
-        
+
         if self.inp.rstrip().find(" ") != -1:
             return
 
@@ -314,7 +341,7 @@ class Scanner:
         self.autofill_cycle = False
 
         valid_kws = [kw for kw in keywords
-            if kw.startswith(self.inp[0]) and kw != self.inp]
+                     if kw.startswith(self.inp[0]) and kw != self.inp]
 
         if valid_kws:
             self.inp = valid_kws[
@@ -343,11 +370,11 @@ class Scanner:
             move_cursor(1, 0)
         elif ch in (72, 80) and self.prev_input:
             clear = clear_out(len(self.inp), self.pos)
-            
+
             self.inp = self.prev_input[self.prev_count % len(self.prev_input)]
             self.pos = len(self.inp)
             self.prev_count += 1 if ch == 72 else -1
-            
+
             stdout.write(clear + self.inp)
 
     def append_ch(self, ch) -> None:
@@ -355,7 +382,7 @@ class Scanner:
         self.autofill_cycle = False
         self.pos += 1
         self.inp = self.inp[:(self.pos-1)] + ch \
-                 + self.inp[(self.pos-1):]
+            + self.inp[(self.pos-1):]
 
     def scan(self) -> None:
         self.inp = ""
@@ -365,9 +392,9 @@ class Scanner:
         while ch not in ("\r", "\n"):
             inp_len = len(self.inp)
             old_pos = self.pos
-            
+
             if not ch:
-                pass # skip if-elif block
+                pass  # skip if-elif block
             elif ch == "\b":
                 self.backspace()
             elif ch == "\x7f":
@@ -381,12 +408,12 @@ class Scanner:
 
             stdout.write(
                 clear_out(inp_len, old_pos)
-              + self.inp + "\b" * (len(self.inp) - self.pos))
-            
+                + self.inp + "\b" * (len(self.inp) - self.pos))
+
             stdout.flush()
 
             ch = self.getch()
-            
+
             if ch in (0, 224):
                 self.handle_special_char()
                 ch = ""
@@ -396,15 +423,17 @@ class Scanner:
         if self.inp.strip():
             self.prev_input.append(self.inp)
             self.prev_count = len(self.prev_input) - 1
-        
+
         stdout.write("\n")
         stdout.flush()
 
 
 ## Redefine print so file defaults to current stdout, this is for @echo off/on ##
 old_print = print
+
+
 def print(*args, **kwargs) -> None:
     if "file" not in kwargs.keys():
         kwargs["file"] = __main__.stdout
-    
+
     old_print(*args, **kwargs)
