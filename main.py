@@ -561,6 +561,7 @@ class Interpreter:
         
         stdout.write("\n" + "\n".join(to_write) + "\n")
         stdout.flush()
+        del to_write
     
     def title(self) -> None:
         try:
@@ -607,6 +608,7 @@ class Interpreter:
         
         stdout.write(buf + "\n")
         stdout.flush()
+        del buf
 
     def cd(self) -> None:
         new_dir = self.evaluate_expr()

@@ -1,6 +1,7 @@
 import os
 import ctypes
 import struct
+import __main__
 from datetime import date
 from math import log, floor
 from dataclasses import dataclass
@@ -201,9 +202,7 @@ def get_console_info() -> tuple:
 
 def move_cursor(x: int, y: int, relative: bool = True) -> int:
     if relative:
-        width, height, curx, cury, wattr, \
-        left, top, right, bottom, maxx, maxy = \
-            get_console_info()
+        width, height, curx, cury, *_ = get_console_info()
                 
         move = (x + curx) + ((y + cury) << 16)
     else:
@@ -260,9 +259,11 @@ def threaded_ls(extension: str, path: str | None = None) -> str:
     entries = len(dir_list)
     dir_list_left = dir_list[:entries>>1]
     dir_list_right = dir_list[entries>>1:]
+    del dir_list
     
     t1 = Thread(target=ls_thread, args=(extension, dir_list_left))
     t2 = Thread(target=ls_thread, args=(extension, dir_list_right))
+    del dir_list_left, dir_list_right
     
     t1.start()
     t2.start()
@@ -398,3 +399,12 @@ class Scanner:
         
         stdout.write("\n")
         stdout.flush()
+
+
+## Redefine print so file defaults to current stdout, this is for @echo off/on ##
+old_print = print
+def print(*args, **kwargs) -> None:
+    if "file" not in kwargs.keys():
+        kwargs["file"] = __main__.stdout
+    
+    old_print(*args, **kwargs)
