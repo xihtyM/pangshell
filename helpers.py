@@ -1,57 +1,25 @@
-import os
-import ctypes
-import struct
 import __main__
-from datetime import date
-from math import log, floor
-from dataclasses import dataclass
 from platform import uname, system
-from signal import signal, SIGINT
-from locale import setlocale, LC_ALL
-from threading import Thread
-from time import sleep
 
-from sys import stdout, platform, \
-    executable, argv
-
-try:
-    from getch import getch
-except ImportError:
-    from msvcrt import getwch as getch, kbhit
+if system() == "Windows":
+    from pangsh_win import *
+elif system() == "Linux":
+    from pangsh_unix import *
+else:
+    print("Your OS is not supported by pangshell.")
+    exit(1)
 
 def_stdout = stdout
-sigint_paused = False
 
 
-def sigint_handler(sig, frame):
-    global sigint_paused
-
-    if sigint_paused:
-        return
-
-    sigint_paused = True
-    raise KeyboardInterrupt
-
-
-signal(SIGINT, sigint_handler)
-
-UNIX = system() == "Linux"
-WIN = system() == "Windows"
-
-setlocale(LC_ALL, ".utf-8")
-gHandle = ctypes.windll.kernel32.GetStdHandle(
-    ctypes.c_long(-11))
-ctypes.windll.kernel32.SetConsoleMode(gHandle, 7)
 MAIN_DIR = os.path.dirname(os.path.realpath(__file__))
-
-if UNIX:
-    libc = ctypes.CDLL('libc.so.6')
-    sysinfo_buf = ctypes.create_string_buffer(4096)  # generous buffer to hold
-    # struct sysinfo
 
 
 def IgnoreReturn(x):
-    """ Explicit return ignore. If a return is ignored without this, there may be a bug. """
+    """ Explicitly ignore return valuie.
+        
+        If a return is ignored without this,
+        there may be a bug. """
 
 
 keywords = [
@@ -66,6 +34,8 @@ keywords = [
     "@echo",
 ]
 
+keywords.sort()  # sort alphabetically for easier autofill
+
 # Constants
 
 RED = (255, 0, 0)
@@ -73,18 +43,9 @@ GREEN = (0, 205, 0)
 BLUE = (55, 125, 190)
 PURPLE = (159, 60, 230)
 
-USR_PATH = os.path.normpath(os.path.expanduser("~/"))
-
 
 def rgb(string: str, rgb: tuple[int, int, int]) -> str:
     return "\u001b[38;2;{};{};{}m{}\u001B[0m".format(*rgb, string)
-
-
-def format_path(path: str) -> str:
-    if path.startswith(USR_PATH):
-        path = "~/" + path.lstrip(USR_PATH)
-
-    return path.replace("\\", "/")
 
 
 def gcwd() -> str:
@@ -159,89 +120,8 @@ def normal_rm(path: str) -> None:
     os.remove(path)
 
 
-@dataclass
-class Uptime:
-    secs: int
-    mins: int
-    hours: int
-    days: int
-
-# TODO: unix compatibility
-
-
-if system() == "Windows":
-    def get_uptime() -> Uptime:
-        # https://www.geeksforgeeks.org/getting-the-time-since-os-startup-using-python/
-
-        ticks = ctypes.windll.kernel32 \
-            .GetTickCount64()
-
-        ms = int(str(ticks)[:-3])
-
-        mins, sec = divmod(ms, 60)
-        hour, mins = divmod(mins, 60)
-        days, hour = divmod(hour, 24)
-
-        return Uptime(sec, mins, hour, days)
-
-elif system() == "Linux":
-    def get_uptime() -> Uptime:
-        global sysinfo_buf, libc
-
-        if libc.sysinfo(sysinfo_buf) != 0:
-            return Uptime(-1, -1, -1, -1)
-
-        ticks = struct.unpack_from('@l', sysinfo_buf.raw)[0]
-
-        ms = int(str(ticks)[:-3])
-
-        mins, sec = divmod(ms, 60)
-        hour, mins = divmod(mins, 60)
-        days, hour = divmod(hour, 24)
-
-        return Uptime(sec, mins, hour, days)
-
-
-def get_screen_res() -> str:
-    user32 = ctypes.windll.user32
-    user32.SetProcessDPIAware()
-    return "{}x{}".format(user32.GetSystemMetrics(0),
-                          user32.GetSystemMetrics(1))
-
-
-def get_console_info() -> tuple:
-    csbi = ctypes.create_string_buffer(22)
-    res = ctypes.windll.kernel32.GetConsoleScreenBufferInfo(
-        gHandle, csbi)
-
-    if not res:
-        raise
-
-    return struct.unpack("hhhhHhhhhhh", csbi.raw)
-
-
-def move_cursor(x: int, y: int, relative: bool = True) -> int:
-    if relative:
-        width, height, curx, cury, *_ = get_console_info()
-
-        move = (x + curx) + ((y + cury) << 16)
-    else:
-        move = x + (y << 16)
-
-    return ctypes.windll.kernel32. \
-        SetConsoleCursorPosition(
-            gHandle,
-            ctypes.c_ulong(move)
-        )
-
-
 def clear_out(inp_len: int, old_pos: int) -> str:
     return " " * (inp_len - old_pos) + "\b \b" * (inp_len)
-
-
-def kbhit_wait() -> None:
-    while not kbhit():
-        sleep(0.03)
 
 
 def remove_word(s: str, pos: int) -> str:

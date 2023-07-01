@@ -627,8 +627,8 @@ class Interpreter:
         try:
             os.chdir(new_dir)
         except FileNotFoundError:
-            print(rgb("File '{}' could not be found.".format(
-                new_dir), RED))
+            raise ValueError("File '{}' could not be found.".format(
+                new_dir))
 
     def echo(self) -> None:
         print(self.evaluate_expr())
@@ -642,8 +642,8 @@ class Interpreter:
         try:
             print(open(file, "r", encoding="utf-8").read())
         except FileNotFoundError:
-            print(rgb("File '{}' could not be found.".format(
-                file), RED))
+            raise ValueError("File '{}' could not be found.".format(
+                file))
 
     def assign(self) -> None:
         self.variables[self.ast[self.ind].name] = self.evaluate_expr()
@@ -654,13 +654,10 @@ class Interpreter:
             run_file(self, args[0] + ".ps")
             return
 
-        if WIN:
-            if os.path.isfile(os.environ["WINDIR"] + "/" + args[0] + ".ps"):
-                run_file(self, os.environ["WINDIR"] + "/" + args[0] + ".ps")
-                return
-            extensions = ("", ".bat", ".exe", ".cmd", ".com")
-        else:
-            extensions = ("", ".bin", ".elf", ".exe", ".sh")
+        if os.path.isfile(os.environ["WINDIR"] + "/" + args[0] + ".ps"):
+            run_file(self, os.environ["WINDIR"] + "/" + args[0] + ".ps")
+            return
+        extensions = ("", ".bat", ".exe", ".cmd", ".com")
 
         for ext in extensions:
             try:
@@ -670,20 +667,19 @@ class Interpreter:
                 pass  # wait until end to catch all exceptions
 
         # check system32
-        if WIN:
-            for ext in extensions:
-                try:
-                    run([
-                        os.environ["WINDIR"] + "/" + args[0] + ext
-                    ] + args[1:],
-                        stdout=stdout
-                    )
-                    return
-                except Exception:
-                    pass  # wait until end to catch all exceptions
+        for ext in extensions:
+            try:
+                run([
+                    os.environ["WINDIR"] + "/" + args[0] + ext
+                ] + args[1:],
+                    stdout=stdout
+                )
+                return
+            except Exception:
+                pass  # wait until end to catch all exceptions
 
-        print(rgb("'{}' is not an operable program or script.\n".format(args[0])
-               + "Try typing the full name, the program must be compiled.", RED))
+        raise ValueError("'{}' is not an operable program or script.\n".format(args[0])
+                + "Try typing the full name, the program must be compiled.")
 
     def run(self, ast: list[ASTNode]) -> None:
         self.ast = ast
@@ -726,8 +722,6 @@ def run_file(i: Interpreter, file: str) -> None:
             p = Parser(l)
             p.parse()
             i.run(p.ast)
-        except SyntaxError as error:
-            print(rgb(error, RED))
         except KeyError as var_name:
             print(rgb("Variable {} does not exist.".format(var_name), RED))
         except Exception as error:
@@ -763,8 +757,6 @@ if __name__ == "__main__":
             sigint_paused = False
             i.run(p.ast)
             sigint_paused = True
-        except SyntaxError as error:
-            print(rgb(error, RED))
         except KeyError as var_name:
             print(rgb("Variable {} does not exist.".format(var_name), RED))
         except Exception as error:
