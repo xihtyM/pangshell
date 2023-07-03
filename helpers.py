@@ -186,6 +186,11 @@ def threaded_ls(extension: str, path: str | None = None) -> str:
     return ls_buf + "\n - Files: {}\n - Directories: {}\n".format(ls_files, ls_dirs)
 
 
+def input_width() -> int:
+    """ Returns the amount of characters the user can input. """
+    return get_console_width() - (len(gcwd()) + 4)
+
+
 class Scanner:
     def __init__(self) -> None:
         self.autofill_cycle = False
@@ -195,10 +200,7 @@ class Scanner:
         self.prev_count = 0
         self.inp = ""
 
-    def getch(self, wait: bool = True) -> int:
-        if wait:
-            kbhit_wait()
-
+    def getch(self) -> int:
         return ord(getch())
 
     def auto_fill(self) -> None:
@@ -240,7 +242,7 @@ class Scanner:
         self.inp = self.inp[:self.pos] + self.inp[self.pos+1:]
 
     def handle_special_char(self) -> None:
-        ch = self.getch(False)
+        ch = self.getch()
 
         if ch == 75 and self.pos > 0:
             self.pos -= 1
@@ -251,9 +253,13 @@ class Scanner:
         elif ch in (72, 80) and self.prev_input:
             clear = clear_out(len(self.inp), self.pos)
 
-            self.inp = self.prev_input[self.prev_count % len(self.prev_input)]
+            if ch == 72 and self.prev_count > 0:
+                self.prev_count -= 1
+            elif ch == 80 and self.prev_count < (len(self.prev_input) - 1):
+                self.prev_count += 1
+            
+            self.inp = self.prev_input[self.prev_count]
             self.pos = len(self.inp)
-            self.prev_count += 1 if ch == 72 else -1
 
             stdout.write(clear + self.inp)
 
@@ -273,10 +279,10 @@ class Scanner:
             inp_len = len(self.inp)
             old_pos = self.pos
 
-            if not ch:
-                pass  # skip if-elif block
-            elif ch == "\b":
+            if ch == "\b":
                 self.backspace()
+            elif len(self.inp) > input_width() or not ch:
+                pass  # skip if-elif block
             elif ch == "\x7f":
                 self.inp = remove_word(self.inp, self.pos)
                 self.pos += len(self.inp) - inp_len
@@ -293,7 +299,7 @@ class Scanner:
             stdout.flush()
 
             ch = self.getch()
-
+            
             if ch in (0, 224):
                 self.handle_special_char()
                 ch = ""
@@ -301,8 +307,13 @@ class Scanner:
                 ch = chr(ch)
 
         if self.inp.strip():
-            self.prev_input.append(self.inp)
-            self.prev_count = len(self.prev_input) - 1
+            if self.inp in self.prev_input:
+                self.prev_input.append(self.prev_input.pop(
+                    self.prev_input.index(self.inp)))
+            else:
+                self.prev_input.append(self.inp)
+            
+            self.prev_count = len(self.prev_input)
 
         stdout.write("\n")
         stdout.flush()

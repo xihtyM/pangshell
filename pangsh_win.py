@@ -8,7 +8,7 @@ from signal import signal, SIGINT
 from locale import setlocale, LC_ALL
 from threading import Thread
 from time import sleep
-from msvcrt import getwch as getch, kbhit
+from msvcrt import getwch as getch
 
 from sys import stdout, platform, \
     executable, argv
@@ -98,7 +98,5 @@ def move_cursor(x: int, y: int, relative: bool = True) -> int:
             ctypes.c_ulong(move)
         )
 
-
-def kbhit_wait() -> None:
-    while not kbhit():
-        sleep(0.03)
+def get_console_width() -> int:
+    return get_console_info()[0]
