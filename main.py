@@ -314,7 +314,7 @@ class Parser:
 
         if keyword in ("echo", "cd", "touch",
                        "type", "title", "del",
-                       "@echo"):
+                       "set",  "@echo"):
             self.ast.append(Keyword(keyword, *self.parse_expr(), self.sudo))
         elif keyword in ("rm", "ls"):
             self.ast.append(
@@ -415,6 +415,7 @@ class Parser:
 class Interpreter:
     def __init__(self) -> None:
         self.variables = dict(os.environ)  # pre-assign environment variables
+        self.setting = []
         self.ast = []
         self.size = 0
         self.ind = 0
@@ -425,9 +426,11 @@ class Interpreter:
             "ls": self.ls,
             "rm": self.rm,
             "del": self.del_var,
+            "set": self.set,
+            "end": self.fin,
             "cls": self.cls,
-            "type": self.type_,
             "echo": self.echo,
+            "type": self.type_,
             "touch": self.touch,
             "title": self.title,
             "uptime": self.uptime,
@@ -436,6 +439,21 @@ class Interpreter:
             "exit": exit,
             "@echo": self.echo_toggle,
         }
+    
+    def get_setting(self) -> None:
+        return ".".join(self.setting)
+    
+    def set(self) -> None:
+        self.setting.append(self.evaluate_expr())
+        
+        if type(self.setting[-1]) is not str:
+            raise ValueError("setting must be a string.")
+    
+    def fin(self) -> None:
+        if not self.setting:
+            raise SyntaxError("nothing was being set.")
+
+        self.setting.pop()
 
     def sudo(self, toggle: bool) -> None:
         if not self.ast[self.ind].sudo:
@@ -541,12 +559,12 @@ class Interpreter:
         info = uname()
         uptime = get_uptime()
 
-        logo = open(self.variables["_logo_"], "r").read().split("\n")
+        logo = open(self.variables["info.logo"], "r").read().split("\n")
 
         try:
             ver = VERSION
         except NameError:
-            ver = self.variables["_version_"]
+            ver = self.variables["info.ver"]
 
         buf = [
             "OS: {} {} {}".format(
@@ -646,8 +664,13 @@ class Interpreter:
                 file))
 
     def assign(self) -> None:
-        self.variables[self.ast[self.ind].name] = self.evaluate_expr()
-
+        name = self.ast[self.ind].name
+        
+        if self.setting:
+            name = self.get_setting() + "." + name
+        
+        self.variables[name] = self.evaluate_expr()
+        
     def run_program(self, args: list[str]) -> None:
         # check if .ps file exists
         if os.path.isfile(args[0] + ".ps"):
@@ -732,11 +755,13 @@ def run_file(i: Interpreter, file: str) -> None:
 
 if __name__ == "__main__":
     sigint_paused = True
+    
     i = Interpreter()
-    i.variables["MAIN_DIR"] = MAIN_DIR
+    i.variables["builtin.main.dir"] = MAIN_DIR
+    
     run_file(i, os.path.join(MAIN_DIR, "startup.ps"))
-
-    VERSION = i.variables["_version_"]
+    
+    VERSION = i.variables["info.ver"]
 
     if "--vars" in argv:
         variables_index = argv.index("--vars")

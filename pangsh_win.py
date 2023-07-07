@@ -71,7 +71,7 @@ def get_screen_res() -> str:
     user32.SetProcessDPIAware()
     return "{}x{}".format(user32.GetSystemMetrics(0),
                             user32.GetSystemMetrics(1))
-        
+
 
 def get_console_info() -> tuple:
     csbi = ctypes.create_string_buffer(22)

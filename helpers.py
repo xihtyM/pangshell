@@ -26,10 +26,11 @@ keywords = [
     "ls",   "echo",
     "cd",   "type",
     "rl",   "sudo",
-    "rm",   "touch",
+    "rm",   "exit",
+    "end",  "touch",
     "del",  "title",
     "cls",  "uptime",
-    "exit", "neofetch",
+    "set",  "neofetch",
 
     "@echo",
 ]
@@ -201,7 +202,13 @@ class Scanner:
         self.inp = ""
 
     def getch(self) -> int:
-        return ord(getch())
+        res = ord(getch())
+        
+        # prevent user from typing escape character - breaks input
+        while res == 27:
+            res = ord(getch())
+        
+        return res
 
     def auto_fill(self) -> None:
         self.pos += 1
@@ -320,7 +327,7 @@ class Scanner:
                 + self.inp + "\b" * (len(self.inp) - self.pos))
 
             stdout.flush()
-
+            
             ch = self.getch()
             
             if ch in (0, 224):
@@ -331,11 +338,9 @@ class Scanner:
 
         if self.inp.strip():
             if self.inp in self.prev_input:
-                self.prev_input.append(self.prev_input.pop(
-                    self.prev_input.index(self.inp)))
-            else:
-                self.prev_input.append(self.inp)
+                del self.prev_input[self.prev_input.index(self.inp)]
             
+            self.prev_input.append(self.inp)
             self.prev_count = len(self.prev_input)
 
         stdout.write("\n")
