@@ -241,27 +241,50 @@ class Scanner:
 
         self.inp = self.inp[:self.pos] + self.inp[self.pos+1:]
 
+    def move_cursor(self, n: int) -> None:
+        self.pos += n
+        move_cursor(n, 0)
+    
+    def autofill_prev(self, n: int) -> None:
+        clear = clear_out(len(self.inp), self.pos)
+
+        self.prev_count += n
+        
+        self.inp = self.prev_input[self.prev_count]
+        self.pos = len(self.inp)
+        stdout.write(clear + self.inp)
+    
+    def move_cursor_word(self, right: bool) -> None:
+        if right:
+            n = self.inp.find(" ", self.pos + 1, len(self.inp))
+            
+            if n == -1:
+                n = len(self.inp)
+        else:
+            n = self.inp.rfind(" ", 0, self.pos)
+            
+            if n == -1:
+                n = 0
+        
+        n -= self.pos
+        
+        self.move_cursor(n)
+     
     def handle_special_char(self) -> None:
         ch = self.getch()
 
-        if ch == 75 and self.pos > 0:
-            self.pos -= 1
-            move_cursor(-1, 0)
-        elif ch == 77 and self.pos < len(self.inp):
-            self.pos += 1
-            move_cursor(1, 0)
-        elif ch in (72, 80) and self.prev_input:
-            clear = clear_out(len(self.inp), self.pos)
-
-            if ch == 72 and self.prev_count > 0:
-                self.prev_count -= 1
-            elif ch == 80 and self.prev_count < (len(self.prev_input) - 1):
-                self.prev_count += 1
-            
-            self.inp = self.prev_input[self.prev_count]
-            self.pos = len(self.inp)
-
-            stdout.write(clear + self.inp)
+        if ch == 75 and self.pos > 0:                                             # RIGHT ARROW
+            self.move_cursor(-1)
+        elif ch == 77 and self.pos < len(self.inp):                               # LEFT ARROW
+            self.move_cursor(1)
+        elif ch == 72 and self.prev_count > 0:                                    # UP ARROW
+            self.autofill_prev(-1)
+        elif ch == 80 and self.prev_count < (len(self.prev_input) - 1):           # DOWN ARROW
+            self.autofill_prev(1)
+        elif ch == 115:                                                           # CTRL + LEFT ARROW
+            self.move_cursor_word(False)
+        elif ch == 116:                                                           # CTRL + RIGHT ARROW
+            self.move_cursor_word(True)
 
     def append_ch(self, ch) -> None:
         self.autofill_count = 0

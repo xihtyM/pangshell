@@ -98,5 +98,6 @@ def move_cursor(x: int, y: int, relative: bool = True) -> int:
             ctypes.c_ulong(move)
         )
 
+
 def get_console_width() -> int:
     return get_console_info()[0]
