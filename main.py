@@ -356,31 +356,30 @@ class Parser:
         if self.cur.type_ == TokenType.SET:
             self.parse_assign()
             return  # we dont want to parse the program anymore as it was an assignment either way
-
+        
+        arg = ""
+        
         while self.cur.type_ not in (
                 TokenType.END_OF_LINE,
                 TokenType.SEMICOLON):
-            if self.cur.type_ == TokenType.WHITESPACE:
-                self.inc()
-                continue
-
-            if self.cur.type_ in (TokenType.ID, TokenType.STRING):
+            
+            if self.cur.type_ == TokenType.WHITESPACE and arg:
+                args.append(arg)
+                arg = ""
+            elif self.cur.type_ == TokenType.STRING:
                 args.append(self.cur.value)
-            elif self.cur.type_ == TokenType.SUB:
-                self.inc()
-
-                if self.cur.type_ in (TokenType.ID, TokenType.STRING):
-                    args.append("-{}".format(self.cur.value))
-                else:
-                    raise SyntaxError("Args must be a string.")
-            elif self.cur.type_ == TokenType.VARIABLE:
-                args.append("{}")
-                variables.append(self.cur.value)
+                arg = ""
+            elif self.cur.type_ == TokenType.NUM:
+                args.append(str(self.cur.value))
+                arg = ""
             else:
-                raise SyntaxError("Args must be a string.")
+                arg += self.cur.value
 
             self.inc()
-
+        
+        if arg:
+            args.append(arg)
+        
         return args, variables
 
     def parse_program(self) -> None:
