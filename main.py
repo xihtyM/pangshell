@@ -414,6 +414,7 @@ class Parser:
 class Interpreter:
     def __init__(self) -> None:
         self.variables = dict(os.environ)  # pre-assign environment variables
+        
         self.setting = []
         self.ast = []
         self.size = 0
@@ -498,7 +499,17 @@ class Interpreter:
 
     def del_var(self) -> None:
         varname = self.evaluate_expr()
+        deleted = False
+        
+        for var in list(self.variables.keys()):  # cast to list so if dict changes size no error occurs
+            if var.startswith("{}.".format(varname)):
+                deleted = True
+                print("Deleting: {}".format(var))
+                del self.variables[var]
 
+        if deleted and varname not in self.variables:
+            return  # dont raise an error as we deleted the setting instead
+        
         del self.variables[varname]
 
     def reload(self):
@@ -703,12 +714,17 @@ class Interpreter:
         raise ValueError("'{}' is not an operable program or script.\n".format(args[0])
                 + "Try typing the full name, the program must be compiled.")
 
+    def set_builtins(self) -> None:
+        self.variables["builtin.main.dir"]  = MAIN_DIR
+        self.variables["builtin.variables"] = ",\n".join(self.variables) + "\n"
+
     def run(self, ast: list[ASTNode]) -> None:
         self.ast = ast
         self.size = len(ast)
         self.ind = 0
 
         while self.ind < self.size:
+            self.set_builtins()
             cur = ast[self.ind]
 
             if type(cur) is Keyword:
@@ -756,7 +772,6 @@ if __name__ == "__main__":
     sigint_paused = True
     
     i = Interpreter()
-    i.variables["builtin.main.dir"] = MAIN_DIR
     
     run_file(i, os.path.join(MAIN_DIR, "startup.ps"))
     
