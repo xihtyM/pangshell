@@ -51,13 +51,14 @@ int main(void)
 
     _chdir(getenv("AppData"));
     pang_mkdir("Pang");
+    pang_mkdir("Pang\\PangShell");
 
     InstallPath *ip = init_install("xihtyM/PangShell/main", NULL);
 
     if (!ip)
         return 1;
 
-    install_files(ip, "Pang");
+    install_files(ip, "Pang\\PangShell");
     finish_install(ip);
 
     _chdir(getenv("WinDir"));
@@ -69,7 +70,7 @@ int main(void)
         return 1;
     }
 
-    fwrite("@echo off\npy \"%pang%\\pangshell.py\" %*", strlen("@echo off\npy \"%pang%\\pangshell.py\" %*"), 1, bat);
+    fwrite("@echo off\npy \"%pang%\\PangShell\\pangshell.py\" %*", strlen("@echo off\npy \"%pang%\\PangShell\\pangshell.py\" %*"), 1, bat);
     fclose(bat);
 
     return 0;
