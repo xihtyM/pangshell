@@ -157,12 +157,14 @@ int install_files(
             strcpy(full_path, path);
             strcat(full_path, "\\");
             strcat(full_path, filename);
-
+            
+            remove(full_path);
             _download(url, full_path);
             free(full_path); // _FREED BLOCK
         }
         else 
         {
+            remove(filename);
             _download(url, filename);
         }
 
