@@ -1,7 +1,6 @@
 logo.txt
 helpers.py
 startup.ps
-pangshell.bat
 pangshell.py
 pangsh_win.py
 pangsh_unix.py

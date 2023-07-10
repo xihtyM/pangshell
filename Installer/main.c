@@ -60,5 +60,17 @@ int main(void)
     install_files(ip, "Pang");
     finish_install(ip);
 
+    _chdir(getenv("WinDir"));
+    FILE *bat = fopen("System32\\pangshell.bat", "w");
+
+    if (!bat)
+    {
+        printf("Error: Couldn't open System32, make sure you are running as administrator.");
+        return 1;
+    }
+
+    fwrite("@echo off\npy \"%pang%\\pangshell.py\" %*", strlen("@echo off\npy \"%pang%\\pangshell.py\" %*"), 1, bat);
+    fclose(bat);
+
     return 0;
 }
